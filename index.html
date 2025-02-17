@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Spinning 3D Sierpinski Tetrahedron</title>
+    <title>Interactive 3D Sierpinski Tetrahedron</title>
     <style>
       body {
         margin: 0;
@@ -14,10 +14,12 @@
     </style>
   </head>
   <body>
-    <!-- Load Three.js from a CDN -->
+    <!-- Load Three.js from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Load dat.GUI from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
     <script>
-      // Set up the scene, camera, and renderer
+      // Set up scene, camera, and renderer
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(
         45,
@@ -26,74 +28,101 @@
         1000
       );
       camera.position.z = 4;
-
+  
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
-
-      // Array to accumulate vertex positions for all triangles
-      const positions = [];
-
-      // Function to add a tetrahedron's faces (as triangles) to the positions array
-      function addTetrahedron(v0, v1, v2, v3) {
-        // Each tetrahedron has 4 faces (triangles)
-        // Face 1
-        positions.push(...v0.toArray(), ...v1.toArray(), ...v2.toArray());
-        // Face 2
-        positions.push(...v0.toArray(), ...v3.toArray(), ...v1.toArray());
-        // Face 3
-        positions.push(...v0.toArray(), ...v2.toArray(), ...v3.toArray());
-        // Face 4
-        positions.push(...v1.toArray(), ...v3.toArray(), ...v2.toArray());
-      }
-
-      // Recursive function to build the Sierpinski tetrahedron
-      function sierpinski(v0, v1, v2, v3, depth) {
-        if (depth === 0) {
-          addTetrahedron(v0, v1, v2, v3);
-        } else {
-          // Compute midpoints of each edge
-          const v01 = new THREE.Vector3().addVectors(v0, v1).multiplyScalar(0.5);
-          const v02 = new THREE.Vector3().addVectors(v0, v2).multiplyScalar(0.5);
-          const v03 = new THREE.Vector3().addVectors(v0, v3).multiplyScalar(0.5);
-          const v12 = new THREE.Vector3().addVectors(v1, v2).multiplyScalar(0.5);
-          const v13 = new THREE.Vector3().addVectors(v1, v3).multiplyScalar(0.5);
-          const v23 = new THREE.Vector3().addVectors(v2, v3).multiplyScalar(0.5);
-
-          // Create 4 smaller tetrahedra at each vertex
-          sierpinski(v0, v01, v02, v03, depth - 1);
-          sierpinski(v1, v01, v12, v13, depth - 1);
-          sierpinski(v2, v02, v12, v23, depth - 1);
-          sierpinski(v3, v03, v13, v23, depth - 1);
+  
+      // Parameters to control each edge’s interpolation factor and recursion depth.
+      // (An edge factor of 0.5 is the midpoint. Adjusting it makes the resulting triangles larger or smaller.)
+      const params = {
+        v01: 0.5,
+        v02: 0.5,
+        v03: 0.5,
+        v12: 0.5,
+        v13: 0.5,
+        v23: 0.5,
+        depth: 3,
+      };
+  
+      // Function that builds the fractal geometry using the current parameters.
+      function buildFractalGeometry() {
+        const positions = [];
+  
+        // Add the 4 triangular faces of a tetrahedron to the positions array.
+        function addTetrahedron(v0, v1, v2, v3) {
+          // Face 1
+          positions.push(...v0.toArray(), ...v1.toArray(), ...v2.toArray());
+          // Face 2
+          positions.push(...v0.toArray(), ...v3.toArray(), ...v1.toArray());
+          // Face 3
+          positions.push(...v0.toArray(), ...v2.toArray(), ...v3.toArray());
+          // Face 4
+          positions.push(...v1.toArray(), ...v3.toArray(), ...v2.toArray());
         }
+  
+        // Recursive function to subdivide the tetrahedron.
+        function sierpinski(v0, v1, v2, v3, depth) {
+          if (depth === 0) {
+            addTetrahedron(v0, v1, v2, v3);
+          } else {
+            // Instead of always taking the midpoint (0.5), use the user-controlled factors.
+            const v01 = new THREE.Vector3().lerpVectors(v0, v1, params.v01);
+            const v02 = new THREE.Vector3().lerpVectors(v0, v2, params.v02);
+            const v03 = new THREE.Vector3().lerpVectors(v0, v3, params.v03);
+            const v12 = new THREE.Vector3().lerpVectors(v1, v2, params.v12);
+            const v13 = new THREE.Vector3().lerpVectors(v1, v3, params.v13);
+            const v23 = new THREE.Vector3().lerpVectors(v2, v3, params.v23);
+  
+            // Create 4 smaller tetrahedra at each vertex.
+            sierpinski(v0, v01, v02, v03, depth - 1);
+            sierpinski(v1, v01, v12, v13, depth - 1);
+            sierpinski(v2, v02, v12, v23, depth - 1);
+            sierpinski(v3, v03, v13, v23, depth - 1);
+          }
+        }
+  
+        // Define the vertices of the initial (regular) tetrahedron.
+        const v0 = new THREE.Vector3( 1,  1,  1);
+        const v1 = new THREE.Vector3(-1, -1,  1);
+        const v2 = new THREE.Vector3(-1,  1, -1);
+        const v3 = new THREE.Vector3( 1, -1, -1);
+  
+        sierpinski(v0, v1, v2, v3, params.depth);
+  
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.computeVertexNormals();
+        return geometry;
       }
-
-      // Define the vertices of the initial (regular) tetrahedron
-      const v0 = new THREE.Vector3( 1,  1,  1);
-      const v1 = new THREE.Vector3(-1, -1,  1);
-      const v2 = new THREE.Vector3(-1,  1, -1);
-      const v3 = new THREE.Vector3( 1, -1, -1);
-
-      // Set the recursion depth (adjust for more/less detail)
-      const depth = 3;
-      sierpinski(v0, v1, v2, v3, depth);
-
-      // Create a BufferGeometry and add the computed vertices
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geometry.computeVertexNormals();
-
-      // Use a MeshNormalMaterial for a colorful, shaded look.
+  
+      // Create initial geometry and mesh
+      let geometry = buildFractalGeometry();
       const material = new THREE.MeshNormalMaterial({
         side: THREE.DoubleSide,
         flatShading: true,
       });
-
-      // Create the mesh and add it to the scene
       const mesh = new THREE.Mesh(geometry, material);
       scene.add(mesh);
-
-      // Animation loop: rotate the mesh and render the scene
+  
+      // Update function to rebuild the fractal when parameters change.
+      function updateFractal() {
+        const newGeometry = buildFractalGeometry();
+        mesh.geometry.dispose();
+        mesh.geometry = newGeometry;
+      }
+  
+      // Set up dat.GUI to control each edge’s factor and the recursion depth.
+      const gui = new dat.GUI();
+      gui.add(params, 'v01', 0, 1).step(0.01).name('Edge v0–v1').onChange(updateFractal);
+      gui.add(params, 'v02', 0, 1).step(0.01).name('Edge v0–v2').onChange(updateFractal);
+      gui.add(params, 'v03', 0, 1).step(0.01).name('Edge v0–v3').onChange(updateFractal);
+      gui.add(params, 'v12', 0, 1).step(0.01).name('Edge v1–v2').onChange(updateFractal);
+      gui.add(params, 'v13', 0, 1).step(0.01).name('Edge v1–v3').onChange(updateFractal);
+      gui.add(params, 'v23', 0, 1).step(0.01).name('Edge v2–v3').onChange(updateFractal);
+      gui.add(params, 'depth', 0, 5).step(1).name('Recursion Depth').onChange(updateFractal);
+  
+      // Animation loop: rotate the mesh and render the scene.
       function animate() {
         requestAnimationFrame(animate);
         mesh.rotation.x += 0.005;
@@ -101,8 +130,8 @@
         renderer.render(scene, camera);
       }
       animate();
-
-      // Update renderer and camera on window resize
+  
+      // Adjust the renderer on window resize.
       window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
@@ -111,3 +140,4 @@
     </script>
   </body>
 </html>
+
